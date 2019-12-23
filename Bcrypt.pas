@@ -266,9 +266,8 @@ interface
 {$ENDIF}
 
 uses
-	SysUtils,
-	{$IFDEF COMPILER_7_UP}Types,{$ENDIF} //Types.pas didn't appear until ~Delphi 7.
-	ComObj, Math;
+	SysUtils, Math, SynCrypto, System.Hash, System.Diagnostics, System.TimeSpan, System.NetEncoding, windows,
+	Types;
 
 type
 {$IFNDEF UNICODE}
@@ -385,10 +384,8 @@ implementation
 
 
 uses
-{$IFDEF Sqm}SqmApi,{$ENDIF}
-{$IFDEF BCryptUnitTests}TestFramework,{$ENDIF}
-	Windows,
-	ActiveX;
+{$IFDEF BCryptUnitTests}TestFramework{$ENDIF}
+ ;
 
 const
 	BCRYPT_COST = 11; //cost determintes the number of rounds. 11 = 2^11 rounds (2,048)
@@ -1306,15 +1303,22 @@ class function TBCrypt.CheckPassword(const password: UnicodeString; const salt, 
 var
 	candidateHash: TBytes;
 	len: Integer;
-	t1, t2: Int64;
+  elapsedTimeStopWatch : TStopwatch;
+  elapsed : TTimeSpan;
+  version: string;
+  unCost : Integer;
+  unSalt : array of Byte;
+  unIsEnhanced : Boolean;
 begin
 	Result := False;
 	PasswordRehashNeeded := False;
+  version := '';
 
-	//Measure how long it takes to run the hash. If it's too quick, it's time to increase the cost
-	t1 := GetPerformanceTimestamp;
+  elapsedTimeStopWatch := TStopwatch.StartNew;
+
 	candidateHash := TBCrypt.HashPassword(password, salt, cost);
-	t2 := GetPerformanceTimestamp;
+
+	elapsed := elapsedTimeStopWatch.Elapsed;
 
 	len := Length(hash);
 	if Length(candidateHash) <> len then
@@ -1488,15 +1492,18 @@ var
 	hash: TBytes;
 	actualHashString: string;
 	prehashedPassword: string;
-	t1, t2: Int64;
+  elapsedTimeStopWatch : TStopwatch;
+  elapsed : TTimeSpan;
 begin
 	PasswordRehashNeeded := False; //indicates if your hash needs upgrading in version or cost
+
+
 
 	if not TryParseHashString(expectedHashString, {out}version, {out}cost, {out}salt, {out}isEnhanced) then
 		raise Exception.Create(SInvalidHashString);
 
 	//Measure how long it takes to run the hash. If it's too quick, it's time to increase the cost
-	t1 := GetPerformanceTimestamp;
+  elapsedTimeStopWatch := TStopwatch.StartNew;
 
 	if isEnhanced then
 	begin
@@ -1507,7 +1514,7 @@ begin
 	else
 		hash := TBCrypt.HashPassword(password, salt, cost);
 
-	t2 := GetPerformanceTimestamp;
+  elapsed := elapsedTimeStopWatch.Elapsed;
 
 	if isEnhanced then
 		actualHashString := FormatEnhancedPasswordHash(version, cost, salt, hash)
@@ -1518,7 +1525,7 @@ begin
 	Result := TBcrypt.TimingSafeSameString(actualHashString, expectedHashString);
 
 	//Based on how long it took to hash the password, see if a rehash is needed to increase the cost
-	PasswordRehashNeeded := TBcrypt.PasswordRehashNeededCore(version, cost, cost, PerformanceTimestampToMs(t2-t1));
+	PasswordRehashNeeded := TBcrypt.PasswordRehashNeededCore(version, cost, cost, elapsed.TotalMilliseconds);
 end;
 
 class function TBCrypt.BsdBase64Encode(const data: array of Byte; BytesToEncode: Integer): string;
@@ -2160,7 +2167,8 @@ end;
 
 class function TBCrypt.GetModernCost_Benchmark: Integer;
 var
-	t1, t2: Int64;
+  elapsedTimeStopWatch : TStopwatch;
+  elapsed : TTimeSpan;
 const
 	testCost = 5; //4;
 begin
@@ -2174,15 +2182,12 @@ begin
 	}
 	Result := BCRYPT_COST; //don't ever go less than the default cost
 
-	t1 := GetPerformanceTimestamp;
-	if (t1 <= 0) then Exit;
-
+  elapsedTimeStopWatch := TStopwatch.StartNew;
 	TBCrypt.HashPassword('Benchmark', testCost);
+  elapsed := elapsedTimeStopWatch.Elapsed;
 
-	t2 := GetPerformanceTimestamp;
-	if (t2 <= 0) then Exit;
+	Result := TBCrypt.GetModernCost(testCost, elapsed.TotalMilliseconds);
 
-	Result := TBCrypt.GetModernCost(testCost, PerformanceTimestampToMs(t2-t1));
 end;
 
 class function TBCrypt.SelfTestD: Boolean;
@@ -2639,8 +2644,9 @@ end;
 procedure TBCryptTests.Benchmark;
 var
 	cost: Integer;
-	t1, t2: Int64;
 	durationMS: Double;
+  elapsedTimeStopWatch : TStopwatch;
+  elapsed : TTimeSpan;
 begin
 	if not FindCmdLineSwitch('SlowUnitTests', ['/', '-'], True) then
 	begin
@@ -2652,14 +2658,14 @@ begin
 
 	cost := 4; //the minimum supported bcrypt cost
 
-	DebugOutput('SAMPLING ON');
+	DebugMsg('SAMPLING ON');
 	while (cost <= 16{31}) do
 	begin
-		t1 := GetPerformanceTimestamp;
+    elapsedTimeStopWatch := TStopwatch.StartNew;
 		TBCrypt.HashPassword('benchmark', cost);
-		t2 := GetPerformanceTimestamp;
+    elapsed := elapsedTimeStopWatch.Elapsed;
 
-		durationMS := PerformanceTimestampToMs(t2-t1);
+		durationMS := elapsed.TotalMilliseconds;
 
 		Status(Format('%d	%.4f', [cost, durationMS]));
 
@@ -2783,13 +2789,16 @@ end;
 
 procedure TBCryptTests.SelfTestF_CorrectBattery;
 var
-	t1, t2: Int64;
+	t1, t2, freq: Int64;
+  elapsedTimeStopWatch : TStopwatch;
+  elapsed : TTimeSpan;
 begin
-	t1 := GetPerformanceTimestamp;
-	CheckTrue(TBcrypt.SelfTestF);
-	t2 := GetPerformanceTimestamp;
 
-	Status(Format('%.4f ms', [PerformanceTimestampToMs(t2-t1)]));
+  elapsedTimeStopWatch := TStopwatch.StartNew;
+	CheckTrue(TBcrypt.SelfTestF);
+	elapsed := elapsedTimeStopWatch.Elapsed;
+
+	Status(Format('%.4f ms', [elapsed.TotalMilliseconds]));
 
 	Status(GetCompilerOptions);
 end;
@@ -2825,26 +2834,26 @@ begin
 end;
 
 procedure TBCryptTests.SpeedTests;
-
 	procedure TimeIt(Cost: Integer);
 	var
-		t1, t2: Int64;
 		timems: Real;
 		bestTime: Real;
 		n: Integer;
+    elapsedTimeStopWatch : TStopwatch;
+    elapsed : TTimeSpan;
 	begin
 		bestTime := 0;
 
 		n := 5;
 		while n > 0 do
 		begin
-			t1 := GetPerformanceTimestamp;
+      elapsedTimeStopWatch := TStopwatch.StartNew;
 			TBCrypt.HashPassword('corrent horse battery staple', Cost);
-			t2 := GetPerformanceTimestamp;
+      elapsed := elapsedTimeStopWatch.Elapsed;
 
 			Dec(n);
 
-			timems := PerformanceTimestampToMs(t2-t1); //milliseconds
+			timems := elapsed.TotalMilliseconds; //milliseconds
 			if (bestTime = 0) or (timems < bestTime) then
 			begin
 				bestTime := timems;
