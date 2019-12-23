@@ -471,6 +471,8 @@ const
 {$IFDEF BCryptUnitTests}
 type
 	TBCryptTests = class(TTestCase)
+  private
+    procedure DebugMsg(msg : string);
 	public
 		procedure SpeedTests;
 		function GetCompilerOptions: string;
@@ -2487,7 +2489,6 @@ begin
 
 	cost := 4; //the minimum supported bcrypt cost
 
-	OutputDebugString('SAMPLING ON');
 	while (cost <= 16{31}) do
 	begin
 		QueryPerformanceCounter({out}t1);
@@ -2503,9 +2504,16 @@ begin
 		if durationMS > 15000 then
 			Break;
 	end;
-	OutputDebugString('SAMPLING OFF');
+	DebugMsg('SAMPLING OFF');
 
 	Status(Self.GetCompilerOptions);
+end;
+
+procedure TBCryptTests.DebugMsg(msg: string);
+begin
+{$IFDEF MSWINDOWS}
+  OutputDebugString(PChar(msg));
+{$ENDIF}
 end;
 
 function TBCryptTests.GetCompilerOptions: string;
