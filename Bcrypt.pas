@@ -1890,28 +1890,8 @@ begin
 end;
 
 class function TBCrypt.GenRandomBytes(len: Integer; const data: Pointer): HRESULT;
-var
-	hProv: THandle;
-const
-	PROV_RSA_FULL = 1;
-	CRYPT_VERIFYCONTEXT = DWORD($F0000000);
-	CRYPT_SILENT         = $00000040;
 begin
-	if not CryptAcquireContextW(hPRov, nil, nil, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT or CRYPT_SILENT) then
-	begin
-		Result := HResultFromWin32(GetLastError);
-		Exit;
-	end;
-	try
-		if not CryptGenRandom(hProv, len, data) then
-		begin
-			Result := HResultFromWin32(GetLastError);
-			Exit;
-		end;
-	finally
-		CryptReleaseContext(hProv, 0);
-	end;
-
+  TAESPRNG.Main.FillRandom(data,len);
 	Result := S_OK;
 end;
 
