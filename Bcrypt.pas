@@ -626,45 +626,12 @@ function CryptDestroyHash(hHash: THandle): BOOL; stdcall; external advapi32;
 
 class function TBCrypt.HashBytes256(Data: TBytes): string;
 var
-	provider: THandle;
-	hash: THandle;
-	digestSize: Cardinal;
-	digest: TBytes;
-const
-	PROV_RSA_AES			= 24; //Provider type; from WinCrypt.h
-	CRYPT_VERIFYCONTEXT	= $F0000000;
-	CALG_SHA_256			= $0000800c;
-	HP_HASHVAL				= $0002;
-	HP_HASHSIZE				= $0004;
+  hashSha256 : THashSHA2;
 begin
 	SetLength(Result, 0);
-
-	if not CryptAcquireContext({out}provider, nil, nil, PROV_RSA_AES, CRYPT_VERIFYCONTEXT) then
-		RaiseLastOSError;
-	try
-		if not CryptCreateHash(provider, CALG_SHA_256, 0, 0, {out}hash) then
-			RaiseLastOSError;
-		try
-			//Hash the data
-			if not CryptHashData(hash, PByte(Data), Length(Data), 0) then
-				RaiseLastOSError;
-
-			//Get the digest size. We know it's 32-bytes, but lets do what is correct.
-			if not CryptGetHashParam(hash, HP_HASHVAL, nil, {var}digestSize, 0) then
-				RaiseLastOSError;
-
-			//Finalize the hash and get the digest
-			SetLength(digest, Integer(digestSize));
-			if not CryptGetHashParam(hash, HP_HASHVAL, @digest[0], {var}digestSize, 0) then
-				RaiseLastOSError;
-
-			Result := TBCrypt.Base64Encode(digest);
-		finally
-			CryptDestroyHash(hash);
-		end;
-	finally
-		CryptReleaseContext(provider, 0);
-	end;
+  hashSha256 := THashSHA2.Create(THashSHA2.TSHA2Version.SHA256);
+  hashSha256.Update(Data);
+  Result :=  TBase64Encoding.Base64.EncodeBytesToString(hashSha256.HashAsBytes);
 end;
 
 class function TBCrypt.HashPassword(const password: UnicodeString; const salt: array of Byte; const cost: Integer): TBytes;
