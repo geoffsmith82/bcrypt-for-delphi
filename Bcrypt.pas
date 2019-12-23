@@ -777,81 +777,16 @@ function CryptReleaseContext(hProv: THandle; dwFlags: DWORD): BOOL; stdcall; ext
 function CryptGenRandom(hProv: THandle; dwLen: DWORD; pbBuffer: Pointer): BOOL; stdcall; external advapi32;
 
 
-{$IFNDEF COMPILER_7_UP}
-procedure RaiseLastOSError;
-begin
-	RaiseLastWin32Error;
-end;
-{$ENDIF}
 
-class function TBCrypt.HashBytes(Data: TBytes; HashAlgorithm: string): string;
+
+class function TBCrypt.HashBytes256(Data: TBytes): string;
 var
-	provider: THandle;
-	hash: THandle;
-	digestSize: Cardinal;
-	digest: TBytes;
-	hashAlgorithmID: Cardinal;
-const
-	PROV_RSA_AES			= 24; //Provider type; from WinCrypt.h
-	CRYPT_VERIFYCONTEXT	= $F0000000;
-
-	ALG_CLASS_HASH = $8000; // (4 << 13)
-	ALG_TYPE_ANY = 0;
-	ALG_SID_SHA_256 = 12;
-	ALG_SID_SHA_384 = 13;
-	ALG_SID_SHA_512 = 14;
-
-//	CALG_SHA_256 = $0000800c;
-	CALG_SHA_256 = (ALG_CLASS_HASH or ALG_TYPE_ANY or ALG_SID_SHA_256);
-	CALG_SHA_384 = (ALG_CLASS_HASH or ALG_TYPE_ANY or ALG_SID_SHA_384);
-	CALG_SHA_512 = (ALG_CLASS_HASH or ALG_TYPE_ANY or ALG_SID_SHA_512);
-
-	HP_HASHVAL				= $0002;
-	HP_HASHSIZE				= $0004;
+  hashSha256 : THashSHA2;
 begin
-{
-	HashAlgorithm:
-		- 'SHA256'
-		- 'SHA384'
-		- 'SHA512'
-}
 	SetLength(Result, 0);
-
-	if HashAlgorithm = 'SHA256' then
-		hashAlgorithmID := CALG_SHA_256
-	else if HashAlgorithm = 'SHA384' then
-		hashAlgorithmID := CALG_SHA_384
-	else if HashAlgorithm = 'SHA512' then
-		hashAlgorithmID := CALG_SHA_512
-	else
-		raise EBCryptException.CreateFmt('Unknown hash algorithm: ''%s''', [HashAlgorithm]);
-
-	if not CryptAcquireContext({out}provider, nil, nil, PROV_RSA_AES, CRYPT_VERIFYCONTEXT) then
-		RaiseLastOSError;
-	try
-		if not CryptCreateHash(provider, hashAlgorithmID, 0, 0, {out}hash) then
-			RaiseLastOSError;
-		try
-			//Hash the data
-			if not CryptHashData(hash, PByte(Data), Length(Data), 0) then
-				RaiseLastOSError;
-
-			//Get the digest size. We know it's 32-bytes, but lets do what is correct.
-			if not CryptGetHashParam(hash, HP_HASHVAL, nil, {var}digestSize, 0) then
-				RaiseLastOSError;
-
-			//Finalize the hash and get the digest
-			SetLength(digest, Integer(digestSize));
-			if not CryptGetHashParam(hash, HP_HASHVAL, @digest[0], {var}digestSize, 0) then
-				RaiseLastOSError;
-
-			Result := TBCrypt.Base64Encode(digest);
-		finally
-			CryptDestroyHash(hash);
-		end;
-	finally
-		CryptReleaseContext(provider, 0);
-	end;
+  hashSha256 := THashSHA2.Create(THashSHA2.TSHA2Version.SHA256);
+  hashSha256.Update(Data);
+  Result :=  TBase64Encoding.Base64.EncodeBytesToString(hashSha256.HashAsBytes);
 end;
 
 class function TBCrypt.HashPassword(const password: UnicodeString; const salt: array of Byte; const cost: Integer): TBytes;
