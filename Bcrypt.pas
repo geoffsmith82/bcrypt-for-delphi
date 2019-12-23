@@ -241,7 +241,7 @@ unit Bcrypt;
 interface
 
 uses
-	SysUtils, Math, SynCrypto, System.Hash, System.Diagnostics, System.TimeSpan, System.NetEncoding, windows,
+	SysUtils, Math, SynCrypto, System.Hash, System.Diagnostics, System.TimeSpan, windows,
 	Types;
 
 type
@@ -724,7 +724,7 @@ begin
 	SetLength(Result, 0);
   hashSha256 := THashSHA2.Create(THashSHA2.TSHA2Version.SHA256);
   hashSha256.Update(Data);
-  Result :=  TBase64Encoding.Base64.EncodeBytesToString(hashSha256.HashAsBytes);
+  Result := Base64Encode(hashSha256.HashAsBytes);
 end;
 
 class function TBCrypt.HashPassword(const password: UnicodeString; const salt: array of Byte; const cost: Integer): TBytes;
