@@ -2142,46 +2142,10 @@ begin
 	Result := True;
 end;
 
-
-{$IFDEF MSWINDOWS}
-function GenRandomBytes_Windows(len: Integer; const data: Pointer): HRESULT;
-var
-	hProv: THandle;
-const
-	PROV_RSA_FULL = 1;
-	CRYPT_VERIFYCONTEXT = DWORD($F0000000);
-	CRYPT_SILENT         = $00000040;
-begin
-	{
-		Get cryptographic random data from the operating system.
-	}
-	if not CryptAcquireContextW(hPRov, nil, nil, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT or CRYPT_SILENT) then
-	begin
-		Result := HResultFromWin32(GetLastError);
-		Exit;
-	end;
-	try
-		if not CryptGenRandom(hProv, len, data) then
-		begin
-			Result := HResultFromWin32(GetLastError);
-			Exit;
-		end;
-	finally
-		CryptReleaseContext(hProv, 0);
-	end;
-
-	Result := S_OK;
-end;
-{$ENDIF}
-
 class function TBCrypt.GenRandomBytes(len: Integer; const data: Pointer): HRESULT;
 begin
-{$IFDEF MSWINDOWS}
-	Result := GenRandomBytes_Windows(len, data);
-{$ELSE}
-//	Here is where you figure out how to call your OS's source of cryptographic random bytes.
-	Result := E_NOTIMPL;
-{$ENDIF}
+  TAESPRNG.Main.FillRandom(data,len);
+	Result := S_OK;
 end;
 
 class function TBCrypt.GetModernCost(SampleCost: Integer; SampleHashDurationMS: Real): Integer;
