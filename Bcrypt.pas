@@ -73,7 +73,7 @@ unit Bcrypt;
 
 	Version 1.14     20190823
 			- Added function to manually prehash a password using SHA-2_256
-			- Added EnchancedHashPassword to prehash the password and output $bcrypt-sha256$ identifier
+			- Added EnhancedHashPassword to prehash the password and output $bcrypt-sha256$ identifier
 			- Improvement: unrolled main loop for performance improvement
 
 	Version 1.13     20180729
@@ -240,56 +240,12 @@ unit Bcrypt;
 
 interface
 
-(*
-	The problem is how to make "TBytes", "UIntPtr", and "UnicodeString" work in Delphi 5, Delphi 7, Delphi 2010, and XE2+
-
-	| Item            | Delphi 5        | Delphi 7              | Delphi 2009            | Delphi 2010            | Delphi XE2             |
-	|-----------------|-----------------|-----------------------|------------------------|------------------------|------------------------|
-	| Product version | 5               | 7                     | 12                     | 14                     | 16                     |
-	| Version         | VER130          | VER150                | VER200                 | VER210                 | VER230                 |
-	| CompilerVersion | n/a             | 15.0                  | 20.0                   | 21.0                   | 23.0                   |
-	| TBytes          | = array of Byte | = Types.TByteDynArray | = Types.TByteDynArray? | = Types.TByteDynArray? | = SysUtils.TBytes      |
-	| UnicodeString   | = WideString    | = WideString          | = System.UnicodeString | = System.UnicodeString | = System.UnicodeString | Added in Delphi 2009
-	| UIntPtr         | = Cardinal      | = Cardinal            | = Cardinal             | = Cardinal             | = System.UIntPtr       |
-
-	And it wasn't until Delphi 6 (CompilerVersion >= 14.0) that conditional expressions (CONDITIONALEXPRESSIONS) were added.
-*)
-{$IFDEF CONDITIONALEXPRESSIONS}
-	{$IF CompilerVersion >= 22}
-		{$DEFINE COMPILER_15_UP} //Delphi XE
-	{$IFEND}
-	{$IF CompilerVersion >= 15}
-		{$DEFINE COMPILER_7_UP} //Delphi 7
-	{$IFEND}
-{$ELSE}
-	{$DEFINE MSWINDOWS} //The MSWINDOWS define didn't work until Delphi 7
-{$ENDIF}
-
 uses
 	SysUtils, Math, SynCrypto, System.Hash, System.Diagnostics, System.TimeSpan, System.NetEncoding, windows,
 	Types;
 
 type
-{$IFNDEF UNICODE}
-	UnicodeString = WideString; //System.UnicodeString wasn't added until Delphi 2009
-{$ENDIF}
 
-{$IFDEF COMPILER_15_UP}
-	//TBytes === System.TArray<System.Byte>
-{$ELSE}
-	{$IFDEF COMPILER_7_UP} //Delphi 7
-		TBytes = Types.TByteDynArray; //TByteDynArray wasn't added until around Delphi 7. Sometime later it moved to SysUtils.
-	{$ELSE}
-		TBytes = array of Byte; //for old-fashioned Delphi 5, we have to do it ourselves
-	{$ENDIF}
-{$ENDIF}
-
-{$IFNDEF COMPILER_15_UP}
-	//Someone said that Delphi 2010 (Delphi 14) didn't have UIntPtr.
-	//So maybe it was Delphi XE (Delphi 15)
-	UIntPtr = Cardinal; //an unsigned, pointer sized, integer
-	UInt32 = Cardinal; //Idera changed the unchangeable "fundamental" LongWord type from UInt32 to UInt64. So we use the "generic" type Cardinal - which hopefully will remain UInt32 going forward
-{$ENDIF}
 
 	TBlowfishData= record
 		InitBlock: array[0..7] of Byte;    { initial IV }
@@ -753,28 +709,13 @@ begin
 	begin
 		//Type 4 UUID (RFC 4122) is a handy source of (almost) 128-bits of random data (actually 120 bits)
 		//But the security doesn't come from the salt being secret, it comes from the salt being different each time
-		type4Uuid := CreateGuid;
+    CreateGUID(type4Uuid);
+
 		Move(type4Uuid.D1, salt[0], BCRYPT_SALT_LEN); //16 bytes
 	end;
 
 	Result := salt;
 end;
-
-const
-	advapi32 = 'advapi32.dll';
-
-function CryptAcquireContext(out phProv: THandle; pszContainer: PWideChar; pszProvider: PWideChar; dwProvType: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32 name 'CryptAcquireContextW';
-function CryptCreateHash(hProv: THandle; Algid: LongWord; hKey: THandle; dwFlags: DWORD; out hHash: THandle): BOOL; stdcall; external advapi32;
-function CryptHashData(hHash: THandle; pbData: PByte; dwDataLen: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32;
-function CryptGetHashParam(hHash: THandle; dwParam: DWORD; pbData: PByte; var dwDataLen: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32;
-function CryptDestroyHash(hHash: THandle): BOOL; stdcall; external advapi32;
-
-function CryptAcquireContextW(out phProv: THandle; pszContainer: PWideChar; pszProvider: PWideChar; dwProvType: DWORD; dwFlags: DWORD): BOOL; stdcall; external advapi32;
-function CryptReleaseContext(hProv: THandle; dwFlags: DWORD): BOOL; stdcall; external advapi32;
-function CryptGenRandom(hProv: THandle; dwLen: DWORD; pbBuffer: Pointer): BOOL; stdcall; external advapi32;
-
-
-
 
 class function TBCrypt.HashBytes256(Data: TBytes): string;
 var
@@ -803,7 +744,7 @@ begin
 		//Truncate if its longer than 72 bytes (BCRYPT_MaxKeyLen), and burn the excess
 		if Length(key) > BCRYPT_MaxKeyLen then
 		begin
-			ZeroMemory(@key[BCRYPT_MaxKeyLen], Length(key)-BCRYPT_MaxKeyLen);
+			FillChar(key[BCRYPT_MaxKeyLen], Length(key)-BCRYPT_MaxKeyLen, 0);
 			SetLength(key,BCRYPT_MaxKeyLen);
 		end;
 
@@ -811,7 +752,7 @@ begin
 	finally
 		if Length(key) > 0 then
 		begin
-			ZeroMemory(@key[0], Length(key));
+			FillChar(key[0], Length(key), 0);
 			SetLength(key, 0);
 		end;
 	end;
@@ -1306,9 +1247,6 @@ var
   elapsedTimeStopWatch : TStopwatch;
   elapsed : TTimeSpan;
   version: string;
-  unCost : Integer;
-  unSalt : array of Byte;
-  unIsEnhanced : Boolean;
 begin
 	Result := False;
 	PasswordRehashNeeded := False;
@@ -1327,15 +1265,8 @@ begin
 	Result := CompareMem(@candidateHash[0], @hash[0], len);
 
 	//Based on how long it took to hash the password, see if a rehash is needed to increase the cost
-	PasswordRehashNeeded := TBcrypt.PasswordRehashNeededCore(version, cost, cost, PerformanceTimestampToMs(t2-t1));
+	PasswordRehashNeeded := TBcrypt.PasswordRehashNeededCore(version, cost, cost, elapsed.TotalMilliseconds);
 end;
-
-{$IFNDEF UNICODE}
-function CharInSet(C: Char; const CharSet: TSysCharSet): Boolean;
-begin
-	Result := C in CharSet;
-end;
-{$ENDIF}
 
 function StrToken(var S: string; Separator: Char): string;
 var
@@ -1960,7 +1891,7 @@ var
 	begin
 		if Length(AArray) > 0 then
 		begin
-			ZeroMemory(@AArray[0], Length(AArray));
+			FillChar(AArray[0], Length(AArray),0);
 			SetLength(AArray, 0);
 		end;
 	end;
@@ -2789,7 +2720,6 @@ end;
 
 procedure TBCryptTests.SelfTestF_CorrectBattery;
 var
-	t1, t2, freq: Int64;
   elapsedTimeStopWatch : TStopwatch;
   elapsed : TTimeSpan;
 begin
