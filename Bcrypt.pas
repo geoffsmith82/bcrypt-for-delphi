@@ -572,6 +572,8 @@ end;
 {$IFDEF BCryptUnitTests}
 type
 	TBCryptTests = class(TTestCase)
+  private
+    procedure DebugMsg(msg : string);
 	public
 		procedure SpeedTests;
 		function GetCompilerOptions: string;
@@ -2770,6 +2772,13 @@ begin
 	DebugOutput('SAMPLING OFF');
 
 	Status(Self.GetCompilerOptions);
+end;
+
+procedure TBCryptTests.DebugMsg(msg: string);
+begin
+{$IFDEF MSWINDOWS}
+  OutputDebugString(PChar(msg));
+{$ENDIF}
 end;
 
 function TBCryptTests.GetCompilerOptions: string;
