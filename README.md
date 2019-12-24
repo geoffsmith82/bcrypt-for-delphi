@@ -1,5 +1,10 @@
 Bcrypt for Delphi
 ==================
+What's different about this version - compared to https://github/JackTrapper/bcrypt-for-delphi?
+This is my work in progress to make it cross-platform.  I have removed windows specific timing code, removed the direct depency on the windows encryption API.  I have replaced it with the Delphi built-in functions for Hashing and the Synapse library for Random number generation.  I have also removed the code for old versions of Delphi. It should work on Delphi 10.3 and maybe of the other more recent versions.
+What is left to do for the conversion?
+There is code handing conversion of passwords to utf8.  This currently uses some windows functions that I am still working out how to replace.  Once this is done it should be fully cross-platform.
+
 
 [Bcrypt](http://en.wikipedia.org/wiki/Bcrypt) is an algorithm designed for hashing passwords, and only passwords; i.e. it:
 
