@@ -73,7 +73,7 @@ unit Bcrypt;
 
 	Version 1.14     20190823
 			- Added function to manually prehash a password using SHA-2_256
-			- Added EnhancedHashPassword to prehash the password and output $bcrypt-sha256$ identifier
+			- Added EnchancedHashPassword to prehash the password and output $bcrypt-sha256$ identifier
 			- Improvement: unrolled main loop for performance improvement
 
 	Version 1.13     20180729
@@ -269,7 +269,7 @@ type
 		class function BsdBase64Encode(const data: array of Byte; BytesToEncode: Integer): string;
 		class function BsdBase64Decode(const s: string): TBytes;
 
-		class function PasswordStringPrep(const Source: UnicodeString): TBytes;
+		class function PasswordStringPrep(const Source: String): TBytes;
 
 		class function SelfTestA: Boolean; //known test vectors
 		class function SelfTestB: Boolean; //BSD's base64 encoder/decoder
@@ -322,14 +322,6 @@ type
 
 implementation
 
-{$IFDEF Strict}
-	{$DEFINE Sqm}
-{$ENDIF}
-
-{$IFDEF NoSqm}
-	{$UNDEF Sqm}
-{$ENDIF}
-
 {$IFDEF UnitTests}
 	{$DEFINE BCryptUnitTests}
 {$ENDIF}
@@ -338,10 +330,11 @@ implementation
 	{$UNDEF BCryptUnitTests}
 {$ENDIF}
 
-
+{$IFDEF BCryptUnitTests}
 uses
-{$IFDEF BCryptUnitTests}TestFramework{$ENDIF}
+TestFramework
  ;
+{$ENDIF}
 
 const
 	BCRYPT_COST = 11; //cost determintes the number of rounds. 11 = 2^11 rounds (2,048)
@@ -473,35 +466,6 @@ const
 		- this base64 string is then passed on to the underlying bcrypt algorithm as the new password to be hashed.
 }
 
-function GetPerformanceTimestamp: Int64;
-begin
-{$IFDEF MSWINDOWS}
-	if not QueryPerformanceCounter({var}Result) then
-		Result := 0;
-{$ELSE}
-	Result := 0;
-{$ENDIF}
-end;
-
-{$IFDEF MSWINDOWS}
-var
-	_freq: Int64 = 0;
-{$ENDIF}
-
-function PerformanceTimestampToMs(const Timestamp: Int64): Real;
-begin
-	if _freq = 0 then
-	begin
-{$IFDEF MSWINDOWS}
-		if not QueryPerformanceFrequency({var}_freq) then
-			_freq := -1;
-{$ELSE}
-		_freq := -1;
-{$ENDIF}
-	end;
-
-	Result := Timestamp / _freq * 1000;
-end;
 
 procedure DebugOutput(const AText: string);
 begin
@@ -525,8 +489,6 @@ end;
 {$IFDEF BCryptUnitTests}
 type
 	TBCryptTests = class(TTestCase)
-  private
-    procedure DebugMsg(msg : string);
 	public
 		procedure SpeedTests;
 		function GetCompilerOptions: string;
@@ -562,59 +524,8 @@ procedure BurnString(var s: UnicodeString); overload;
 begin
 	if Length(s) > 0 then
 	begin
-		{$IFDEF UNICODE}
-		{
-			In Delphi 5 (and really anything before XE2), UnicodeString is an alias for WideString.
-			WideString does not have, or does it need, an RTL UniqueString function.
-		}
-		UniqueString({var}s); //We can't FillChar the string if it's shared, or its in the constant data page
-		{$ENDIF}
-		FillChar(s[1], Length(s)*SizeOf(WideChar), 0);
+		FillChar(s[1], Length(s), 0);
 		s := '';
-	end;
-end;
-
-procedure BurnString(var s: AnsiString); overload;
-begin
-	{
-		If the string is actually constant (reference count of -1), then any attempt to burn it will be
-		an access violation; as the memory is sitting in a read-only data page.
-
-		But Delphi provides no supported way to get the reference count of a string.
-
-		It's also an issue if someone else is currently using the string (i.e. Reference Count > 1).
-		If the string were only referenced by the caller (with a reference count of 1), then
-		our function here, which received the string through a var reference would also have teh string with
-		a reference count of one.
-
-		Either way, we can only burn the string if there's no other reference.
-
-		The use of UniqueString, while counter-intuitiave, is the best approach.
-		If you pass an unencrypted password to BurnString as a var parameter, and there were another reference,
-		the string would still contain the password on exit. You can argue that what's the point of making a *copy*
-		of a string only to burn the copy. Two things:
-
-			- if you're debugging it, the string you passed will now be burned (i.e. your local variable will be empty)
-			- most of the time the RefCount will be 1. When RefCount is one, UniqueString does nothing, so we *are* burning
-				the only string
-	}
-	if Length(s) > 0 then
-	begin
-		{
-			By not calling UniqueString, we only save on a memory allocation and wipe if RefCnt <> 1
-			It's an unsafe micro-optimization because we're using undocumented offsets to reference counts.
-
-			And i'm really uncomfortable using it because it really is undocumented.
-			It is absolutely a given that it won't change. And we'd have stopped using Delphi long before
-			it changes. But i just can't do it.
-
-			//if PLongInt(PByte(S) - 8)^ = 1 then //RefCnt=1
-			//	ZeroMemory(Pointer(s), System.Length(s)*SizeOf(WideChar));
-		}
-		UniqueString({var}s); //ensure the passed in string has a reference count of one
-		FillChar(s[1], Length(s)*SizeOf(AnsiChar), 0);
-
-		s := ''; //We want the callee to see their passed string come back as empty (even if it was shared with other variables)
 	end;
 end;
 
@@ -721,7 +632,7 @@ class function TBCrypt.HashBytes256(Data: TBytes): string;
 var
   hashSha256 : THashSHA2;
 begin
-	SetLength(Result, 0);
+  SetLength(Result, 0);
   hashSha256 := THashSHA2.Create(THashSHA2.TSHA2Version.SHA256);
   hashSha256.Update(Data);
   Result := Base64Encode(hashSha256.HashAsBytes);
@@ -824,7 +735,6 @@ var
 	i: Integer;
 	plainText: array[0..23] of Byte;
 	cipherText: array[0..23] of Byte;
-{$IFDEF Sqm}t1: Int64;{$ENDIF}
 
 const
 	magicText: AnsiString = 'OrpheanBeholderScryDoubt'; //the 24-byte data we will be encrypting 64 times
@@ -832,9 +742,6 @@ begin
 {
 	The output of bcrypt is 24-bytes, the result of encrypting "OrpheanBeholderScryDoubt" (24-characters) 64 times.
 }
-{$IFDEF Sqm}
-	t1 := Sqm.GetTimestamp;
-{$ENDIF}
 	try
 		state := TBCrypt.EksBlowfishSetup(cost, salt, key);
 
@@ -861,12 +768,6 @@ begin
 		FillChar(plainText[0], SizeOf(plainText), 0);
 		FillChar(cipherText[0], 24, 0);
 	end;
-
-
-{$IFDEF Sqm}
-	Sqm.TimerStop('BCrypt/CryptCore', t1);
-	Sqm.TimerStop('BCrypt/CryptCore/Cost'+IntToStr(Cost), t1);
-{$ENDIF}
 end;
 
 
@@ -1138,10 +1039,8 @@ var
 	keyOffset: Integer;
 	A: Cardinal;
 	keyB: PByteArray;
-	block	: array[0..7] of Byte;
-	//block: TBlowfishBlock;
+	block: array[0..7] of Byte;
 	keyLen: Integer;
-	//saltHalf: Integer;
 	saltHalfIndex: Integer;
 begin
 {
@@ -1416,47 +1315,45 @@ end;
 
 class function TBCrypt.CheckPassword(const password: UnicodeString; const ExpectedHashString: string; out PasswordRehashNeeded: Boolean): Boolean;
 var
-	version: string;
-	cost: Integer;
-	salt: TBytes;
-	isEnhanced: Boolean;
-	hash: TBytes;
-	actualHashString: string;
-	prehashedPassword: string;
-  elapsedTimeStopWatch : TStopwatch;
-  elapsed : TTimeSpan;
+    version: string;
+    cost: Integer;
+    salt: TBytes;
+    isEnhanced: Boolean;
+    hash: TBytes;
+    actualHashString: string;
+    prehashedPassword: string;
+    elapsedTimeStopWatch : TStopwatch;
+    elapsed : TTimeSpan;
 begin
-	PasswordRehashNeeded := False; //indicates if your hash needs upgrading in version or cost
+    PasswordRehashNeeded := False; //indicates if your hash needs upgrading in version or cost
 
-
-
-	if not TryParseHashString(expectedHashString, {out}version, {out}cost, {out}salt, {out}isEnhanced) then
-		raise Exception.Create(SInvalidHashString);
+    if not TryParseHashString(expectedHashString, {out}version, {out}cost, {out}salt, {out}isEnhanced) then
+        raise Exception.Create(SInvalidHashString);
 
 	//Measure how long it takes to run the hash. If it's too quick, it's time to increase the cost
-  elapsedTimeStopWatch := TStopwatch.StartNew;
+    elapsedTimeStopWatch := TStopwatch.StartNew;
 
-	if isEnhanced then
-	begin
-		prehashedPassword := TBCrypt.Prehash256(password);
-		hash := TBCrypt.HashPassword(prehashedPassword, salt, cost);
-		BurnString({var}preHashedPassword);
-	end
-	else
-		hash := TBCrypt.HashPassword(password, salt, cost);
+    if isEnhanced then
+    begin
+        prehashedPassword := TBCrypt.Prehash256(password);
+        hash := TBCrypt.HashPassword(prehashedPassword, salt, cost);
+        BurnString(preHashedPassword);
+    end
+    else
+        hash := TBCrypt.HashPassword(password, salt, cost);
 
-  elapsed := elapsedTimeStopWatch.Elapsed;
+    elapsed := elapsedTimeStopWatch.Elapsed;
 
-	if isEnhanced then
-		actualHashString := FormatEnhancedPasswordHash(version, cost, salt, hash)
-	else
-		actualHashString := FormatPasswordHashForBsd(version, cost, salt, hash);
+    if isEnhanced then
+        actualHashString := FormatEnhancedPasswordHash(version, cost, salt, hash)
+    else
+        actualHashString := FormatPasswordHashForBsd(version, cost, salt, hash);
 
-	//Result := (actualHashString = expectedHashString);
-	Result := TBcrypt.TimingSafeSameString(actualHashString, expectedHashString);
+   	//Result := (actualHashString = expectedHashString);
+    Result := TBcrypt.TimingSafeSameString(actualHashString, expectedHashString);
 
-	//Based on how long it took to hash the password, see if a rehash is needed to increase the cost
-	PasswordRehashNeeded := TBcrypt.PasswordRehashNeededCore(version, cost, cost, elapsed.TotalMilliseconds);
+    //Based on how long it took to hash the password, see if a rehash is needed to increase the cost
+    PasswordRehashNeeded := TBcrypt.PasswordRehashNeededCore(version, cost, cost, elapsed.TotalMilliseconds);
 end;
 
 class function TBCrypt.BsdBase64Encode(const data: array of Byte; BytesToEncode: Integer): string;
@@ -1760,10 +1657,10 @@ end;
 //Requires Vista or newer. Similar functionality existed in Windows 2000 under FoldString
 //function NormalizeString(NormForm: Cardinal; SrcString: PWideChar; SrcLength: Cardinal; DstString: PWideChar; DstLength: Cardinal): Integer; stdcall; external 'Normaliz.dll';
 
-class function TBCrypt.PasswordStringPrep(const Source: UnicodeString): TBytes;
+class function TBCrypt.PasswordStringPrep(const Source: String): TBytes;
 var
 	normalizedLength: Integer;
-	normalized: UnicodeString;
+	normalized: String;
 	strLen: Integer;
 	dw: DWORD;
 const
@@ -2017,7 +1914,7 @@ end;
 
 class function TBCrypt.GenRandomBytes(len: Integer; const data: Pointer): HRESULT;
 begin
-  TAESPRNG.Main.FillRandom(data,len);
+  TAESPRNG.Main.FillRandom(data, len);
 	Result := S_OK;
 end;
 
@@ -2254,10 +2151,10 @@ end;
 
 class function TBCrypt.SelfTestI: Boolean;
 var
-	password: UnicodeString;
+	password: String;
 	utf8: TBytes;
 const
-	n: UnicodeString=''; //n=nothing.
+	n: String=''; //n=nothing.
 			//Work around bug in Delphi compiler when building widestrings
 			//http://stackoverflow.com/a/7031942/12597
 begin
@@ -2281,7 +2178,7 @@ begin
 				n:  0x6E
 				\0: 0x00
 	}
-	password := n + WideChar('A') + WideChar(#$0308) + WideChar(#$FB01) + WideChar('n');
+	password := n + 'A' + #$0308 + #$FB01 + 'n';
 
 	utf8 := TBCrypt.PasswordStringPrep(password);
 
@@ -2574,47 +2471,41 @@ end;
 
 procedure TBCryptTests.Benchmark;
 var
-	cost: Integer;
-	durationMS: Double;
-  elapsedTimeStopWatch : TStopwatch;
-  elapsed : TTimeSpan;
+    cost: Integer;
+    durationMS: Double;
+    elapsedTimeStopWatch : TStopwatch;
+    elapsed : TTimeSpan;
 begin
-	if not FindCmdLineSwitch('SlowUnitTests', ['/', '-'], True) then
-	begin
-		Status('Very slow test. Specify -SlowUnitTests to include');
-		Exit;
-	end;
+    if not FindCmdLineSwitch('SlowUnitTests', ['/', '-'], True) then
+    begin
+        Status('Very slow test. Specify -SlowUnitTests to include');
+        Exit;
+    end;
 
-	Status('Cost factor	Duration (ms)');
 
-	cost := 4; //the minimum supported bcrypt cost
+    Status('Cost factor	Duration (ms)');
 
-	DebugMsg('SAMPLING ON');
-	while (cost <= 16{31}) do
-	begin
-    elapsedTimeStopWatch := TStopwatch.StartNew;
-		TBCrypt.HashPassword('benchmark', cost);
-    elapsed := elapsedTimeStopWatch.Elapsed;
+    cost := 4; //the minimum supported bcrypt cost
 
-		durationMS := elapsed.TotalMilliseconds;
+    DebugOutput('SAMPLING ON');
+    while (cost <= 16{31}) do
+    begin
+        elapsedTimeStopWatch := TStopwatch.StartNew;
+        TBCrypt.HashPassword('benchmark', cost);
+        elapsed := elapsedTimeStopWatch.Elapsed;
 
-		Status(Format('%d	%.4f', [cost, durationMS]));
+        durationMS := elapsed.TotalMilliseconds;
 
-		Inc(cost);
+        Status(Format('%d	%.4f', [cost, durationMS]));
 
-		if durationMS > 15000 then
-			Break;
-	end;
-	DebugOutput('SAMPLING OFF');
+        Inc(cost);
 
-	Status(Self.GetCompilerOptions);
-end;
+        if durationMS > 15000 then
+            Break;
+    end;
+    DebugOutput('SAMPLING OFF');
 
-procedure TBCryptTests.DebugMsg(msg: string);
-begin
-{$IFDEF MSWINDOWS}
-  OutputDebugString(PChar(msg));
-{$ENDIF}
+    Status(Self.GetCompilerOptions);
 end;
 
 function TBCryptTests.GetCompilerOptions: string;
@@ -2720,17 +2611,16 @@ end;
 
 procedure TBCryptTests.SelfTestF_CorrectBattery;
 var
-  elapsedTimeStopWatch : TStopwatch;
-  elapsed : TTimeSpan;
+    elapsedTimeStopWatch : TStopwatch;
+    elapsed : TTimeSpan;
 begin
+    elapsedTimeStopWatch := TStopwatch.StartNew;
+    CheckTrue(TBcrypt.SelfTestF);
+    elapsed := elapsedTimeStopWatch.Elapsed;
 
-  elapsedTimeStopWatch := TStopwatch.StartNew;
-	CheckTrue(TBcrypt.SelfTestF);
-	elapsed := elapsedTimeStopWatch.Elapsed;
+    Status(Format('%.4f ms', [elapsed.TotalMilliseconds]));
 
-	Status(Format('%.4f ms', [elapsed.TotalMilliseconds]));
-
-	Status(GetCompilerOptions);
+    Status(GetCompilerOptions);
 end;
 
 procedure TBCryptTests.SelfTestG_PasswordLength;
@@ -2764,6 +2654,7 @@ begin
 end;
 
 procedure TBCryptTests.SpeedTests;
+
 	procedure TimeIt(Cost: Integer);
 	var
 		timems: Real;
@@ -2775,21 +2666,21 @@ procedure TBCryptTests.SpeedTests;
 		bestTime := 0;
 
 		n := 5;
-		while n > 0 do
-		begin
-      elapsedTimeStopWatch := TStopwatch.StartNew;
-			TBCrypt.HashPassword('corrent horse battery staple', Cost);
-      elapsed := elapsedTimeStopWatch.Elapsed;
+    while n > 0 do
+    begin
+        elapsedTimeStopWatch := TStopwatch.StartNew;
+        TBCrypt.HashPassword('corrent horse battery staple', Cost);
+        elapsed := elapsedTimeStopWatch.Elapsed;
 
-			Dec(n);
+        Dec(n);
 
-			timems := elapsed.TotalMilliseconds; //milliseconds
-			if (bestTime = 0) or (timems < bestTime) then
-			begin
-				bestTime := timems;
-				n := 5; //we found a new min. Wait until we get five min in a row
-			end;
-		end;
+        timems := elapsed.TotalMilliseconds; //milliseconds
+        if (bestTime = 0) or (timems < bestTime) then
+        begin
+            bestTime := timems;
+            n := 5; //we found a new min. Wait until we get five min in a row
+        end;
+    end;
 
 		Status(Format('BCrypt, cost=%d: %.2f ms', [cost, bestTime]));
 	end;

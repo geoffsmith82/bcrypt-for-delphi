@@ -1,4 +1,4 @@
-program bcrypt-tests;
+program bcrypttests;
 {
 
   Delphi DUnit Test Project
