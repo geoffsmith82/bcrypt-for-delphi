@@ -292,7 +292,7 @@ type
 		class function TimingSafeSameString(const Safe, User: string): Boolean;
 		class function PasswordRehashNeededCore(const Version: string; const Cost: Integer; SampleCost: Integer; SampleHashDurationMS: Real): Boolean;
 
-		class function HashBytes(Data: TBytes; HashAlgorithm: string): string;
+		class function HashBytes256(Data: TBytes): string;
 		class function Base64Encode(const data: array of Byte): string;
 	public
 		// Hashes a password into the OpenBSD password-file format (non-standard base-64 encoding). Also validate that BSD style string
@@ -352,6 +352,21 @@ const
 		|   14 | 16,384 iterations |  4,006.78 ms |  1,997.6 ms | 1,390.5 ms |  1,336.5 ms |
 		|   15 | 32,768 iterations |  8,027.05 ms |  3,999.9 ms | 2,781.4 ms |  2,670.5 ms |
 		|   16 | 65,536 iterations | 15,982.14 ms |  8,008.2 ms | 5,564.9 ms |  5,342.8 ms |
+
+		| Cost | Iterations        | i7-10750H    |
+		|                          |      2022-Q4 |
+		|                          |     2.60 GHz |
+		|------|-------------------|--------------|
+		|    8 |    256 iterations |     17.10 ms |  <-- minimum allowed by BCrypt
+		|    9 |    512 iterations |     33.41 ms |
+		|   10 |  1,024 iterations |     66.00 ms |
+		|   11 |  2,048 iterations |    130.86 ms |  <-- current default (BCRYPT_COST=11)
+		|   12 |  4,096 iterations |    274.76 ms |
+		|   13 |  8,192 iterations |    510.37 ms |
+		|   14 | 16,384 iterations |  1,116.58 ms |
+		|   15 | 32,768 iterations |  1,879.10 ms |
+		|   16 | 65,536 iterations |  3,652.44 ms |
+
 
 
 		At the time of deployment in 1976, crypt could hash fewer than 4 passwords per second. (250 ms per password)
@@ -593,18 +608,6 @@ begin
 	//tries to validate a 2b password it will fail.
 	//Wait a year or so until everyone has the new bcrypt
 	Result := FormatPasswordHashForBsd('2a', cost, salt, hash);
-end;
-
-function CoCreateGuid(out guid: TGUID): HResult; stdcall; external 'ole32.dll' name 'CoCreateGuid';
-
-function CreateGUID: TGUID;
-begin
-	//Creates a random (i.e. Type-4) UUID
-{$IFDEF COMPILER_7_UP}
-	OleCheck(SysUtils.CreateGuid({out}Result));
-{$ELSE}
-	OleCheck(CoCreateGuid({out}Result));
-{$ENDIF}
 end;
 
 class function TBCrypt.GenerateSalt: TBytes;
@@ -1819,7 +1822,7 @@ begin
 }
 	key := TBCrypt.PasswordStringPrep(password);
 	try
-		Result := TBCrypt.HashBytes(key, 'SHA256');
+		Result := TBCrypt.HashBytes256(key);
 	finally
 		BurnArray(key);
 	end;
@@ -2345,7 +2348,7 @@ begin
 	data[6] := Ord('r');
 	data[7] := Ord('d');
 
-	actual := TBCrypt.HashBytes(data, 'SHA256');
+	actual := TBCrypt.HashBytes256(data);
 
 	Result := ('XohImNooBHFR0OVvjcYpJ3NgPQ1qq73WKhHvch0VQtg=' = actual);
 end;
