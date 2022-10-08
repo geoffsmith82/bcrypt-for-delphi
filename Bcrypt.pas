@@ -296,20 +296,20 @@ type
 		class function Base64Encode(const data: array of Byte): string;
 	public
 		// Hashes a password into the OpenBSD password-file format (non-standard base-64 encoding). Also validate that BSD style string
-		class function HashPassword(const Password: UnicodeString): string; overload;
-		class function HashPassword(const Password: UnicodeString; Cost: Integer): string; overload;
-		class function CheckPassword(const Password: UnicodeString; const ExpectedHashString: string; out PasswordRehashNeeded: Boolean): Boolean; overload;
+		class function HashPassword(const Password: String): string; overload;
+		class function HashPassword(const Password: String; Cost: Integer): string; overload;
+		class function CheckPassword(const Password: String; const ExpectedHashString: string; out PasswordRehashNeeded: Boolean): Boolean; overload;
 
 		// Applies sha-256 preshashing to a password. The returned string is suitable to pass to HashPassword.
-		class function Prehash256(const password: UnicodeString): string;
+		class function Prehash256(const password: String): string;
 
 		// Performs sha-256 pre-hashing on the password (to allow unlimited password lengths, and avoid DoS attacks). Emits '$bcrypt-sha256$' format.
-		class function EnhancedHashPassword(const password: UnicodeString): string; overload;
-		class function EnhancedHashPassword(const password: UnicodeString; Cost: Integer): string; overload;
+		class function EnhancedHashPassword(const password: String): string; overload;
+		class function EnhancedHashPassword(const password: String; Cost: Integer): string; overload;
 
 		// If you want to handle the cost, salt, and encoding yourself, you can do that.
-		class function HashPassword(const password: UnicodeString; const salt: array of Byte; const cost: Integer): TBytes; overload;
-		class function CheckPassword(const password: UnicodeString; const salt, hash: array of Byte; const Cost: Integer; out PasswordRehashNeeded: Boolean): Boolean; overload;
+		class function HashPassword(const password: String; const salt: array of Byte; const cost: Integer): TBytes; overload;
+		class function CheckPassword(const password: String; const salt, hash: array of Byte; const Cost: Integer; out PasswordRehashNeeded: Boolean): Boolean; overload;
 		class function GenerateSalt: TBytes;
 
 		// Evaluate the cost (or version) of a hash string, and figure out if it needs to be rehashed
@@ -546,7 +546,7 @@ end;
 
 { TBCrypt }
 
-class function TBCrypt.HashPassword(const Password: UnicodeString): string;
+class function TBCrypt.HashPassword(const Password: String): string;
 var
 	cost: Integer;
 begin
@@ -586,7 +586,7 @@ begin
 	Result := TBCrypt.HashPassword(password, cost);
 end;
 
-class function TBCrypt.HashPassword(const password: UnicodeString; Cost: Integer): string;
+class function TBCrypt.HashPassword(const password: String; Cost: Integer): string;
 var
 	salt: TBytes;
 	hash: TBytes;
@@ -683,13 +683,13 @@ type
 	Encrypt a single 64-bit block encoded as two 32-bit halves.
 	InData: Pointer to two
 }
-procedure BlowfishEncryptECB(const Data: TBlowfishData; InData: PLongWord; OutData: PLongWord);
+procedure BlowfishEncryptECB(const Data: TBlowfishData; InData: PUInt32; OutData: PUInt32);
 var
-	xL, xR: LongWord;
+	xL, xR: UInt32;
 	S0, S1, S2, S3: PSBox;
 begin
-	xL := PLongWord(InData)^;
-	xR := PLongWord(UIntPtr(InData)+4)^;
+	xL := PUInt32(InData)^;
+	xR := PUInt32(UInt32(InData)+4)^;
 
 	xL := (xL shr 24) or ((xL shr 8) and $FF00) or ((xL shl 8) and $FF0000) or (xL shl 24);
 	xR := (xR shr 24) or ((xR shr 8) and $FF00) or ((xR shl 8) and $FF0000) or (xR shl 24);
@@ -1083,7 +1083,7 @@ begin
 	end;
 
 	//Blowfish-encrypt the first 64 bits of the salt argument using the current state of the key schedule.
-	BlowfishEncryptECB(State, PLongWord(@salt[0]), PLongWord(@block));
+	BlowfishEncryptECB(State, PUInt32(@salt[0]), PUInt32(@block));
 
 	//The resulting ciphertext replaces subkeys P1 and P2.
 	State.PBox[0] := (block[0] shl 24) or (block[1] shl 16) or (block[2] shl 8) or block[3];
@@ -1098,8 +1098,8 @@ begin
 		//Delphi compiler is not worth its salt; it doesn't do hoisting ("Any compiler worth its salt will hoist" - Eric Brumer C++ compiler team)
 		//[Build 2013 Native Code Performance and Memory The Elephant in the CPU](https://youtu.be/kUpKE2F2lHc?t=1295)
 		//Salt is 0..15 (0..7 is first block, 8..15 is second block)
-		PLongWord(@block[0])^ := PLongWord(@block[0])^ xor PLongWord(@salt[saltHalfIndex  ])^;
-		PLongWord(@block[4])^ := PLongWord(@block[4])^ xor PLongWord(@salt[saltHalfIndex+4])^;
+		PUInt32(@block[0])^ := PUInt32(@block[0])^ xor PUInt32(@salt[saltHalfIndex  ])^;
+		PUInt32(@block[4])^ := PUInt32(@block[4])^ xor PUInt32(@salt[saltHalfIndex+4])^;
 		//block.Lo := block.Lo xor PLongWord(@salt[saltHalfIndex+0])^;
 		//block.Hi := block.Hi xor PLongWord(@salt[saltHalfIndex+4])^;
 
@@ -1110,8 +1110,8 @@ begin
 		BlowfishEncryptECB(State, @block, @block);
 
 		// The output of the second encryption replaces subkeys P3 and P4. (P[2] and P[3])
-		State.PBox[i*2+0] := LongWord(block[3]) or (block[2] shl 8) or (block[1] shl 16) or (block[0] shl 24);
-		State.PBox[i*2+1] := LongWord(block[7]) or (block[6] shl 8) or (block[5] shl 16) or (block[4] shl 24);
+		State.PBox[i*2+0] := UInt32(block[3]) or (block[2] shl 8) or (block[1] shl 16) or (block[0] shl 24);
+		State.PBox[i*2+1] := UInt32(block[7]) or (block[6] shl 8) or (block[5] shl 16) or (block[4] shl 24);
 	end;
 
 	//When ExpandKey finishes replacing entries in the P-Array, it continues on replacing S-box entries two at a time.
@@ -1123,8 +1123,8 @@ begin
 			//That same ciphertext is also XORed with the second 64-bits of salt
 			//Delphi compiler is not worth its salt; it doesn't do hoisting ("Any compiler worth its salt will hoist" - Eric Brumer C++ compiler team)
 			//Salt is 0..15 (0..7 is first block, 8..15 is second block)
-			PLongWord(@block[0])^ := PLongWord(@block[0])^ xor PLongWord(@salt[saltHalfIndex  ])^;
-			PLongWord(@block[4])^ := PLongWord(@block[4])^ xor PLongWord(@salt[saltHalfIndex+4])^;
+			PUInt32(@block[0])^ := PUInt32(@block[0])^ xor PUInt32(@salt[saltHalfIndex  ])^;
+			PUInt32(@block[4])^ := PUInt32(@block[4])^ xor PUInt32(@salt[saltHalfIndex+4])^;
 
 			//saltHalf := saltHalf xor 1;
 			saltHalfIndex := saltHalfIndex xor 8;
@@ -1133,8 +1133,8 @@ begin
 			BlowfishEncryptECB(State, @Block, @Block);
 
 			// The output of the second encryption replaces subkeys S1 and P2. (S[0] and S[1])
-			State.SBox[j, i+0] := LongWord(block[3]) or (block[2] shl 8) or (block[1] shl 16) or (block[0] shl 24);
-			State.SBox[j, i+1] := LongWord(block[7]) or (block[6] shl 8) or (block[5] shl 16) or (block[4] shl 24);
+			State.SBox[j, i+0] := UInt32(block[3]) or (block[2] shl 8) or (block[1] shl 16) or (block[0] shl 24);
+			State.SBox[j, i+1] := UInt32(block[7]) or (block[6] shl 8) or (block[5] shl 16) or (block[4] shl 24);
 
 			Inc(i, 2);
 		end;
@@ -1316,7 +1316,7 @@ begin
 	end;
 end;
 
-class function TBCrypt.CheckPassword(const password: UnicodeString; const ExpectedHashString: string; out PasswordRehashNeeded: Boolean): Boolean;
+class function TBCrypt.CheckPassword(const password: String; const ExpectedHashString: string; out PasswordRehashNeeded: Boolean): Boolean;
 var
     version: string;
     cost: Integer;
