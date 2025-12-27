@@ -1,4 +1,4 @@
-program bcrypttests;
+program TestsBcrypt;
 {
 
   Delphi DUnit Test Project
@@ -16,7 +16,9 @@ program bcrypttests;
 
 uses
   DUnitTestRunner,
-  Bcrypt in 'Bcrypt.pas';
+  BcryptTests in 'BcryptTests.pas',
+  uSecureRandom in '..\uSecureRandom.pas',
+  Bcrypt in '..\Bcrypt.pas';
 
 {$R *.RES}
 
