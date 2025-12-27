@@ -35,26 +35,26 @@ type
 
 	published
 
-		procedure SelfTestA_KnownTestVectors; //known test vectors
-		procedure SelfTestB_Base64EncoderDecoder; //BSD's base64 encoder/decoder
-		procedure SelfTestC_UnicodeStrings; //unicode strings in UTF8
-		procedure SelfTestD_VariableLengthPasswords; //different length passwords
-		procedure SelfTestE_SaltRNG; //salt rng
-		procedure SelfTestF_CorrectBattery; //correctbatteryhorsestapler
-		procedure SelfTestG_PasswordLength; //check that we support up to 72 characters
-		procedure SelfTestH_OpenBSDLengthBug; //check that we don't limit our passwords to 256 characters (as OpenBSD did)
-		procedure SelfTestI_UnicodeCompatibleComposition; //check that we apply KC normalization (NIST SP 800-63B)
-		procedure SelfTestJ_NormalizedPasswordsMatch; //
-		procedure SelfTestK_SASLprep; //
-		procedure SelfTestL_Prehash;
+		[Test] procedure SelfTestA_KnownTestVectors; //known test vectors
+		[Test] procedure SelfTestB_Base64EncoderDecoder; //BSD's base64 encoder/decoder
+		[Test] procedure SelfTestC_UnicodeStrings; //unicode strings in UTF8
+		[Test] procedure SelfTestD_VariableLengthPasswords; //different length passwords
+		[Test] procedure SelfTestE_SaltRNG; //salt rng
+		[Test] procedure SelfTestF_CorrectBattery; //correctbatteryhorsestapler
+	  [Test] procedure SelfTestG_PasswordLength; //check that we support up to 72 characters
+		[Test] procedure SelfTestH_OpenBSDLengthBug; //check that we don't limit our passwords to 256 characters (as OpenBSD did)
+		[Test] procedure SelfTestI_UnicodeCompatibleComposition; //check that we apply KC normalization (NIST SP 800-63B)
+		[Test] procedure SelfTestJ_NormalizedPasswordsMatch; //
+		[Test] procedure SelfTestK_SASLprep; //
+		[Test] procedure SelfTestL_Prehash;
 
-		procedure Test_ParseHashString; //How well we handle past, present, and future versioning strings
+		[Test] procedure Test_ParseHashString; //How well we handle past, present, and future versioning strings
 
-		procedure TestEnhancedHash;
-		procedure TestParseEnhancedHash;
+		[Test] procedure TestEnhancedHash;
+		[Test] procedure TestParseEnhancedHash;
 
 		procedure Benchmark;
-		procedure Test_ManualSystem;
+		[Test] procedure Test_ManualSystem;
 	end;
 
 
