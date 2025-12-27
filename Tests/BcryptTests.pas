@@ -3,15 +3,15 @@ unit BcryptTests;
 interface
 
 uses
+  DUnitX.TestFramework,
   System.SysUtils,
   System.Diagnostics,
   System.TimeSpan,
-  TestFramework,
   Bcrypt
  ;
 
 type
-	TBCryptTests = class(TTestCase)
+	TBCryptTests = class(TObject)
 	public
 		procedure SpeedTests;
 		function GetCompilerOptions: string;
@@ -634,12 +634,12 @@ begin
 		Exit;
 	end;
 
-	CheckTrue(SelfTestA);
+  Assert.IsTrue(SelfTestA);
 end;
 
 procedure TBCryptTests.SelfTestB_Base64EncoderDecoder;
 begin
-	CheckTrue(SelfTestB);
+  Assert.IsTrue(SelfTestB);
 end;
 
 procedure TBCryptTests.SelfTestC_UnicodeStrings;
@@ -650,7 +650,7 @@ begin
 		Exit;
 	end;
 
-	CheckTrue(SelfTestC);
+  Assert.IsTrue(SelfTestC);
 end;
 
 procedure TBCryptTests.SelfTestD_VariableLengthPasswords;
@@ -661,12 +661,12 @@ begin
 		Exit;
 	end;
 
-	CheckTrue(SelfTestD);
+  Assert.IsTrue(SelfTestD);
 end;
 
 procedure TBCryptTests.SelfTestE_SaltRNG;
 begin
-	CheckTrue(SelfTestE);
+  Assert.IsTrue(SelfTestE);
 end;
 
 procedure TBCryptTests.SelfTestF_CorrectBattery;
@@ -675,7 +675,7 @@ var
     elapsed : TTimeSpan;
 begin
     elapsedTimeStopWatch := TStopwatch.StartNew;
-    CheckTrue(SelfTestF);
+    Assert.IsTrue(SelfTestF);
     elapsed := elapsedTimeStopWatch.Elapsed;
 
     Status(Format('%.4f ms', [elapsed.TotalMilliseconds]));
@@ -685,32 +685,32 @@ end;
 
 procedure TBCryptTests.SelfTestG_PasswordLength;
 begin
-	CheckTrue(SelfTestG);
+  Assert.IsTrue(SelfTestG);
 end;
 
 procedure TBCryptTests.SelfTestH_OpenBSDLengthBug;
 begin
-	CheckTrue(SelfTestH);
+  Assert.IsTrue(SelfTestH);
 end;
 
 procedure TBCryptTests.SelfTestI_UnicodeCompatibleComposition;
 begin
-	CheckTrue(SelfTestI);
+  Assert.IsTrue(SelfTestI);
 end;
 
 procedure TBCryptTests.SelfTestJ_NormalizedPasswordsMatch;
 begin
-	CheckTrue(SelfTestJ);
+  Assert.IsTrue(SelfTestJ);
 end;
 
 procedure TBCryptTests.SelfTestK_SASLprep;
 begin
-	CheckTrue(SelfTestK);
+  Assert.IsTrue(SelfTestK);
 end;
 
 procedure TBCryptTests.SelfTestL_Prehash;
 begin
-	CheckTrue(SelfTestL);
+  Assert.IsTrue(SelfTestL);
 end;
 
 procedure TBCryptTests.SpeedTests;
@@ -766,10 +766,10 @@ var
 	passwordValid: Boolean;
 begin
 	expectedHash := TBCrypt.EnhancedHashPassword('correct battery horse staple');
-	CheckTrue(expectedHash <> '');
+  Assert.IsTrue(expectedHash <> '');
 
 	passwordValid := TBcrypt.CheckPassword('correct battery horse staple', expectedHash, {out}passwordRehashNeeded);
-	CheckTrue(passwordValid);
+  Assert.IsTrue(passwordValid);
 end;
 
 procedure TBCryptTests.TestParseEnhancedHash;
@@ -785,14 +785,14 @@ begin
 	hash := '$bcrypt-sha256$2a,12$LrmaIX5x4TRtAwEfwJZa1.$2ehnw6LvuIUTM0iz4iz9hTxv21B6KFO';
 
 	bRes := TBCrypt.TryParseHashString(hash, {out}version, {out}cost, {out}actualSalt, {out}isEnhanced);
-	CheckTrue(bRes);
+  Assert.IsTrue(bRes);
 
-	CheckEquals('2a', version);
-	CheckEquals(12, cost);
-	CheckEquals(True, isEnhanced); //is enhanced
+  Assert.AreEqual('2a', version);
+	Assert.AreEqual(12, cost);
+	Assert.AreEqual(True, isEnhanced); //is enhanced
 
 	actualSaltBase64 := TBCrypt.BsdBase64Encode(actualSalt, Length(actualSalt));
-	CheckEquals('LrmaIX5x4TRtAwEfwJZa1.', actualSaltBase64);
+	Assert.AreEqual('LrmaIX5x4TRtAwEfwJZa1.', actualSaltBase64);
 end;
 
 procedure TBCryptTests.Test_ManualSystem;
@@ -814,8 +814,8 @@ begin
 	hash := TBCrypt.HashPassword(password, salt, 4); //4 is the lowest cost we'll accept
 
 	validPassword := TBCrypt.CheckPassword(password, salt, hash, 4, {out}passwordRehashNeeded);
-	CheckTrue(validPassword);
-	CheckTrue(passwordRehashNeeded, 'Expected passwordRehashNeede to be true, given that we used a cost of 4');
+  Assert.IsTrue(validPassword);
+  Assert.IsTrue(passwordRehashNeeded, 'Expected passwordRehashNeede to be true, given that we used a cost of 4');
 end;
 
 procedure TBCryptTests.Test_ParseHashString;
@@ -833,17 +833,17 @@ procedure TBCryptTests.Test_ParseHashString;
 //		expectedSalt := TBCrypt.BsdBase64Decode(ExpectedSaltBase64);
 		actualResult := TBCrypt.TryParseHashString(HashString, {out}actualVersion, {out}actualCost, {out}actualSalt, {out}actualIsEnhanced);
 
-		CheckEquals(expectedResult, actualResult, HashString+'   '+TestSituation);
+		Assert.AreEqual(expectedResult, actualResult, HashString+'   '+TestSituation);
 		if actualResult then
 		begin
-			CheckEquals(ExpectedVersion, actualVersion, 'Version for hash: '+HashString+'   '+TestSituation);
-			CheckEquals(ExpectedCost, actualCost, 'Cost for hash: '+HashString+'   '+TestSituation);
+			Assert.AreEqual(ExpectedVersion, actualVersion, 'Version for hash: '+HashString+'   '+TestSituation);
+			Assert.AreEqual(ExpectedCost, actualCost, 'Cost for hash: '+HashString+'   '+TestSituation);
 
 			actualSaltBase64 := TBCrypt.BsdBase64Encode(actualSalt, Length(actualSalt));
-			CheckEquals(expectedSaltBase64, actualSaltBase64, 'Salt for hash: '+HashString+'   '+TestSituation);
+			Assert.AreEqual(expectedSaltBase64, actualSaltBase64, 'Salt for hash: '+HashString+'   '+TestSituation);
 
 			//These are non-enhanced hash strings (expect False)
-			CheckEquals(False, actualIsEnhanced, 'Is Enhanced for hash: '+HashString+'	'+TestSituation);
+			Assert.AreEqual(False, actualIsEnhanced, 'Is Enhanced for hash: '+HashString+'	'+TestSituation);
 		end;
 	end;
 begin
@@ -876,6 +876,6 @@ begin
 end;
 
 initialization
-	RegisterTest('Library', TBCryptTests.Suite);
+	TDUnitX.RegisterTestFixture(TBCryptTests);
 
 end.
