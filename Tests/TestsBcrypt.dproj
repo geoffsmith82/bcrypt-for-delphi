@@ -108,7 +108,6 @@
         <Manifest_File>(None)</Manifest_File>
         <DCC_UnitSearchPath>D:\Programming\components\SynPDF;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_Define>UnitTests;$(DCC_Define)</DCC_Define>
-        <Debugger_RunParams>-SlowUnitTests</Debugger_RunParams>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">

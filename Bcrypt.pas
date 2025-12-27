@@ -610,8 +610,9 @@ var
 	xL, xR: UInt32;
 	S0, S1, S2, S3: PSBox;
 begin
-	xL := PUInt32(InData)^;
-	xR := PUInt32(UInt32(InData)+4)^;
+  xL := PUInt32(InData)^;
+  xR := PUInt32(UIntPtr(InData) + SizeOf(UInt32))^;
+
 
 	xL := (xL shr 24) or ((xL shr 8) and $FF00) or ((xL shl 8) and $FF0000) or (xL shl 24);
 	xR := (xR shr 24) or ((xR shr 8) and $FF00) or ((xR shl 8) and $FF0000) or (xR shl 24);
@@ -647,8 +648,9 @@ begin
 	xR := (xR shr 24) or ((xR shr 8) and $FF00) or ((xR shl 8) and $FF0000) or (xR shl 24);
 
 	//Got rid of the moves
-	PLongWord(OutData)^ := xR;
-	PLongWord(UIntPtr(OutData)+4)^ := xL;
+  PUInt32(OutData)^ := xR;
+  PUInt32(UIntPtr(OutData) + SizeOf(UInt32))^ := xL;
+
 end;
 {$RANGECHECKS ON}
 {$OVERFLOWCHECKS ON}
